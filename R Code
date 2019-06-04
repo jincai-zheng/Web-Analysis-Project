@@ -1,0 +1,474 @@
+#########data preprocessing############
+library(plyr)
+library(foreign)
+df=read.csv('BEPS.csv')
+attach(df)
+df=df[,-1]
+str(df)
+head(df)
+
+##Change data type
+df$economic.cond.national=factor(df$economic.cond.national, order=F,levels = c(1,2,3,4,5))
+df$economic.cond.household=factor(df$economic.cond.household,order=F, levels = c(1,2,3,4,5))
+df$Blair=factor(df$Blair, order=F,levels = c(1,2,3,4,5))
+df$Hague=factor(df$Hague, order=F, levels = c(1,2,3,4,5))
+df$Kennedy=factor(df$Kennedy, order=F,levels = c(1,2,3,4,5))
+df$Europe=factor(df$Europe, order=F, levels = c(1,2,3,4,5,6,7,8,9,10,11))
+df$political.knowledge=factor(df$political.knowledge, order=F,levels = c(0,1,2,3))
+df$gender=ifelse(gender=="male",1,2)
+df$gender=factor(df$gender)
+levels(df$vote)[levels(df$vote)%in% c("Labour","Liberal Democrat")]<-"2"
+levels(df$vote)[levels(df$vote)%in% c("Conservative")]<-"1"
+dim(df)
+sum(df_test$vote=="1")
+
+#check missing value
+sum(is.na(df))#
+
+##########Data visualization:#########
+library(psych)
+str(df)
+summary(df)
+describe(df)
+
+##pairplot
+pairs(~.,data=df)
+
+
+library(ggplot2)
+#histplot of age by political knowledge
+ggplot(df, aes(x=age,fill=gender))+
+  geom_histogram(position = "identity", alpha = 0.4)
+  
+  
+##########Train Test Split##########
+# Set random seed
+set.seed(1)
+#  70% observations work as training data
+subset = sample(1:nrow(df), 1068) 
+df_train = df[subset,]
+# The rest 30% are test data
+df_test = df[-subset,]
+
+#############Upsmaple Train Test Split##########
+set.seed(1)
+train_majority = df_train[which(df_train$vote==2),]
+train_minority = df_train[which(df_train$vote==1),]
+subset2= sample(1:nrow(train_minority),nrow(train_majority),replace = TRUE)
+train_minority_upsampled = train_minority[subset2,] # reproducible results
+train_upsampled = rbind(train_majority, train_minority_upsampled)
+dim(train_upsampled )
+table(train_upsampled$vote) #check whether we get balanced class label
+
+#############Logistics Regression#############
+colnames(df)
+glm.fit = glm(vote~.,data = df_train,family = binomial)
+summary(glm.fit)
+glm.fit = glm(vote~age+economic.cond.national+Blair+Hague+Kennedy+Europe+political.knowledge,data = df_train,family = binomial)
+summary(glm.fit)
+
+glm.pred = predict(glm.fit, df_test, type="response")
+predictions = (glm.pred>.5) # try different cut-offs
+
+# performance
+table(predictions, df_test$vote)
+df_test$vote_l=ifelse(df_test$vote=="1", FALSE,TRUE)
+table(predictions, df_test$vote_l)
+
+# Performance: Confusion matrix
+library(caret)
+confusionMatrix(table(predictions, df_test$vote_l))
+
+#ROC
+glm.roc=roc(df_test$vote, glm.pred)
+plot(glm.roc,print.auc=TRUE, auc.polygon=TRUE, grid=c(0.1,0.2) ,max.auc.polygon=TRUE,print.thres=TRUE,auc.polygon.col="skyblue")
+coords(glm.roc, "best")
+
+#########Upsample#########
+glm.fit = glm(vote~age+economic.cond.national+Blair+Hague+Kennedy+Europe+political.knowledge,data = train_upsampled,family = binomial)
+glm.pred=predict(glm.fit,df_test,type = "response")
+predictions=(glm.pred>1.5)
+
+# performance
+table(predictions, df_test$vote)
+df_test$vote_l=ifelse(df_test$vote=="1", TRUE, FALSE)
+table(predictions, df_test$vote_l)
+
+
+# Performance: Confusion matrix
+library(caret)
+confusionMatrix(table(predictions, df_test$vote_l))
+
+glm.roc=roc(df_test$vote, glm.pred)
+plot(glm.roc,print.auc=TRUE, auc.polygon=TRUE, grid=c(0.1,0.2) ,max.auc.polygon=TRUE,print.thres=TRUE,auc.polygon.col="skyblue")
+coords(glm.roc, "best")
+
+############## recursive partitioning tree ( no ROC )#########
+library(rpart)
+df.rp = rpart(vote ~ ., data=df_train)
+summary(df.rp)
+
+# visualize the tree
+plot(df.rp)
+text(df.rp)
+# use parameters to adjust the layout
+plot(df.rp, uniform=TRUE, branch=0.1, margin=0.1)
+text(df.rp, all=TRUE, use.n=TRUE)
+
+# performance
+predictions = predict(df.rp, df_test, type="class")
+table(predictions, df_test$vote)
+
+# performance: Confusion matrix
+library(caret)
+confusionMatrix(table(predictions, df_test$vote))
+
+
+#######Upsample
+library(rpart)
+df.rp = rpart(vote ~ ., data=train_upsampled)
+summary(df.rp)
+
+# visualize the tree
+plot(df.rp)
+text(df.rp)
+# use parameters to adjust the layout
+plot(df.rp, uniform=TRUE, branch=0.1, margin=0.1)
+text(df.rp, all=TRUE, use.n=TRUE)
+
+# performance
+predictions = predict(df.rp, df_test, type="class")
+table(predictions, df_test$vote)
+# performance: Confusion matrix
+library(caret)
+confusionMatrix(table(predictions, df_test$vote))
+
+############ conditional inference tree###########
+library(party)
+df.ci = ctree(vote ~ ., data=df_train)
+df.ci
+
+# visualize the tree
+plot(df.ci) # too big 
+# export the tree graph
+jpeg(file="c:/tmp/df.ci.jpg",width=2000,height=1000)
+plot(df.ci, main="CI Tree") 
+dev.off() # close the plot
+
+# performance
+predictions = predict(df.ci, df_test)
+table(predictions, df_test$vote)
+# performance: Confusion matrix
+library(caret)
+confusionMatrix(table(predictions, df_test$vote))
+
+####Upsample
+library(party)
+df.ci = ctree(vote ~ ., data=train_upsampled)
+df.ci
+
+# visualize the tree
+plot(df.ci) # too big 
+# export the tree graph
+jpeg(file="c:/tmp/df.ci.jpg",width=2000,height=1000)
+plot(df.ci, main="CI Tree") 
+dev.off() # close the plot
+
+# performance
+predictions = predict(df.ci, df_test)
+table(predictions, df_test$vote)
+
+# performance: Confusion matrix
+library(caret)
+confusionMatrix(table(predictions, df_test$vote))
+
+################NaiveBayes## no ROC##############
+library(e1071)
+df.NB = naiveBayes(df_train[,!names(df_train) %in% c("vote")], df_train$vote)
+df.NB
+
+# performance
+predictions = predict(df.NB, df_test[,!names(df_test) %in% c("vote")])
+
+table(predictions, df_test$vote)
+library(caret)
+confusionMatrix(table(predictions, df_test$vote))
+
+##Upsample
+df.NB = naiveBayes(train_upsampled[,!names(train_upsampled) %in% c("vote")], train_upsampled$vote)
+df.NB
+
+predictions = predict(df.NB, df_test[,!names(df_test) %in% c("vote")])
+
+table(predictions,  df_test$vote)
+library(caret)
+confusionMatrix(table(predictions, df_test$vote))
+
+############ random forest########no ROC###############
+install.packages("randomForest")
+library(randomForest)
+df.rf = randomForest(vote ~ ., data=df_train, importance=T)
+df.rf
+importance(df.rf)
+
+# performance
+predictions = predict(df.rf, df_test)
+table(predictions, df_test$vote)
+
+# Performance: Confusion matrix
+library(caret)
+confusionMatrix(table(predictions, df_test$vote))
+
+###Upsample
+df.rf = randomForest(vote ~ ., data=train_upsampled, importance=T)
+df.rf
+importance(df.rf)
+
+# performance
+predictions = predict(df.rf, df_test)
+table(predictions, df_test$vote)
+# Performance: Confusion matrix
+library(caret)
+confusionMatrix(table(predictions, df_test$vote))
+
+####################linear discriminant analysis(LDA)
+library (MASS) 
+
+lda.fit=lda(vote~.,data=df_train)
+lda.fit
+
+lda.pred=predict(lda.fit,df_test,type="response")
+
+# performance
+lda.class=lda.pred$class
+table(lda.class, df_test$vote)
+# performance: confusion matrix
+library(caret)
+confusionMatrix(table(lda.class, df_test$vote))
+
+#Upsample####
+lda.fit=lda(vote~.,data=train_upsampled)
+lda.fit
+
+lda.pred=predict(lda.fit,df_test,type="response")
+
+# performance
+lda.class=lda.pred$class
+table(lda.class, df_test$vote)
+# performance: confusion matrix
+library(caret)
+confusionMatrix(table(lda.class, df_test$vote))
+
+################SVM#############
+library(e1071)
+df.SVM = svm(vote~., data=df_train, kernel="radial", cost=1, gamma=1/ncol(df_train))
+summary(df.SVM)
+
+# performance
+predictions = predict(df.SVM, df_test[,!names(df_test) %in% c("vote")])
+table(predictions, df_test$vote)
+# performance: confusion matrix
+library(caret)
+confusionMatrix(table(predictions, df_test$vote)
+
+####Upsample
+library(e1071)
+df.SVM = svm(vote~., data=train_upsampled, kernel="radial", cost=1, gamma=1/ncol(train_upsampled))
+summary(df.SVM)
+
+# performance
+predictions = predict(df.SVM, df_test[,!names(df_test) %in% c("vote")])
+table(predictions, df_test$vote)
+# performance: confusion matrix
+library(caret)
+confusionMatrix(table(predictions, df_test$vote))
+
+# GBM#################################################################
+###此处vote变换了data type 为dummy/numeric
+install.packages("gbm")
+library(gbm)
+
+head(df_train)
+df_train=df_train[,!names(df_train) %in% c("1", "2")]
+df_test=df_test[,!names(df_test) %in% c("1", "2")]
+
+df_train$vote = ifelse(df_train$vote=="1", 1, 0)
+df_test$vote = ifelse(df_test$vote=="1", 1, 0)
+
+str(df)
+set.seed(1)
+df.GBM=gbm(vote~., distribution="bernoulli", data=df_train, n.trees=1000, 
+              interaction.depth=7, shrinkage=0.01, cv.folds = 3)
+summary(df.GBM)
+
+# prediction
+pred = predict(df.GBM, df_test, n.trees=1000)
+
+# finding the best cut-off 
+# install.packages("pROC")
+library(pROC)
+df.roc=roc(df_test$vote, pred)
+plot(df.roc,print.auc=TRUE, auc.polygon=TRUE, grid=c(0.1,0.2) ,max.auc.polygon=TRUE,print.thres=TRUE,auc.polygon.col="skyblue")
+coords(df.roc, "best")
+
+# obtaining the classification table
+predictions = ifelse(pred>coords(df.roc, "best") ["threshold"], 1, 0)
+table(predictions, df_test$vote)
+# performance: confusion matrix
+library(caret)
+confusionMatrix(table(predictions, df_test$vote))
+
+#Upsample
+head(train_upsampled)
+train_upsampled=train_upsampled[,!names(train_upsampled) %in% c("1", "2")]
+df_test=df_test[,!names(df_test) %in% c("1", "2")]
+
+train_upsampled$vote = ifelse(train_upsampled$vote=="1", 1, 0)
+df_test$vote = ifelse(df_test$vote=="1", 1, 0)
+
+str(df)
+set.seed(1)
+df.GBM=gbm(vote~., distribution="bernoulli", data=train_upsampled, n.trees=1000, 
+           interaction.depth=7, shrinkage=0.01, cv.folds = 3)
+summary(df.GBM)
+
+# prediction
+pred = predict(df.GBM, df_test, n.trees=1000)
+
+# finding the best cut-off 
+# install.packages("pROC")
+library(pROC)
+df.roc=roc(df_test$vote, pred)
+plot(df.roc,print.auc=TRUE, auc.polygon=TRUE, grid=c(0.1,0.2) ,max.auc.polygon=TRUE,print.thres=TRUE,auc.polygon.col="skyblue")
+coords(df.roc, "best")
+
+# obtaining the classification table
+predictions = ifelse(pred>coords(df.roc, "best") ["threshold"], 1, 0)
+table(predictions, df_test$vote)
+# performance: confusion matrix
+library(caret)
+confusionMatrix(table(predictions, df_test$vote))
+
+############################3
+###此处所有变量为numeric
+##########KNN
+df=read.csv('BEPS.csv')
+attach(df)
+df=df[,-1]
+df$age<-as.numeric(df$age)
+df$economic.cond.national<-as.numeric(df$economic.cond.national)
+df$economic.cond.household<-as.numeric(df$economic.cond.household)
+df$Blair<-as.numeric(df$Blair)
+df$Hague<-as.numeric(df$Hague)
+df$Kennedy<-as.numeric(df$Kennedy)
+df$Europe<-as.numeric(df$Europe)
+df$gender<-as.numeric(df$gender)
+levels(df$vote)[levels(df$vote)%in% c("Labour","Liberal Democrat")]<-"0"
+levels(df$vote)[levels(df$vote)%in% c("Conservative")]<-"1"
+df$vote<-as.numeric(df$vote)
+set.seed(1)
+#  70% observations work as training data
+subset = sample(1:nrow(df), 1068) 
+df_train = df[subset,]
+# The rest 30% are test data
+df_test = df[-subset,]
+
+Xtrain=df_train[,-1]
+Xtest=df_test[,-1]
+library(class)
+k_vector = 1:10
+f1 = rep(0,length(k_vector))
+for (k in k_vector){
+  set.seed(1)
+  prediction = knn(Xtrain,Xtest,df_train$vote,k)
+  f1[k]=F1_Score(df_test$vote,prediction,positive = '1')
+}
+best_k<-which.max(f1)
+max(f1,na.rm=TRUE)
+KNN.predictions = knn(df_train[,!names(df_train) %in% c("vote")],df_test[,!names(df_test) %in% c("vote")],df_train$vote,k=best_k,prob=TRUE)
+prob <- attr(KNN.predictions, "prob")
+# performance
+table(KNN.predictions, df_test$vote)
+# Performance: Confusion matrix
+library(caret)
+confusionMatrix(table(KNN.predictions, df_test$vote))
+
+#ROC
+knn.roc=roc(df_test$vote, prob)
+plot(knn.roc,print.auc=TRUE, auc.polygon=TRUE, grid=c(0.1,0.2) ,max.auc.polygon=TRUE,print.thres=TRUE,auc.polygon.col="skyblue")
+coords(knn.roc, "best")
+
+####upsampling for knn
+df=read.csv('BEPS.csv')
+attach(df)
+df=df[,-1]
+str(df)
+head(df)
+
+levels(df$vote)[levels(df$vote)%in% c("Labour","Liberal Democrat")]<-"0"
+levels(df$vote)[levels(df$vote)%in% c("Conservative")]<-"1"
+dim(df)
+sum(df_test$vote=="1")
+#data preprocessing
+
+sum(is.na(df))#
+
+df$age<-as.numeric(df$age)
+df$economic.cond.national<-as.numeric(df$economic.cond.national)
+df$economic.cond.household<-as.numeric(df$economic.cond.household)
+df$Blair<-as.numeric(df$Blair)
+df$Hague<-as.numeric(df$Hague)
+df$Kennedy<-as.numeric(df$Kennedy)
+df$Europe<-as.numeric(df$Europe)
+df$gender<-as.numeric(df$gender)
+df$vote<-as.numeric(df$vote)
+
+#Train Test Split
+# Set random seed
+set.seed(1)
+#  70% observations work as training data
+subset = sample(1:nrow(df), 1068) 
+df_train = df[subset,]
+# The rest 30% are test data
+df_test = df[-subset,]
+
+train_majority = df_train[which(df_train$vote==2),]
+train_minority = df_train[which(df_train$vote==1),]
+subset2= sample(1:nrow(train_minority),nrow(train_majority),replace = TRUE)
+train_minority_upsampled = train_minority[subset2,] # reproducible results
+train_upsampled = rbind(train_majority, train_minority_upsampled)
+dim(train_upsampled )
+table(train_upsampled$vote) #check whether we get balanced class label
+
+Xtrain=train_upsampled[,-1]
+Xtest=df_test[,-1]
+library(class)
+k_vector = 1:10
+f1 = rep(0,length(k_vector))
+for (k in k_vector){
+  set.seed(1)
+  prediction = knn(Xtrain,Xtest,train_upsampled$vote,k)
+  f1[k]=F1_Score(df_test$vote,prediction,positive = '1')
+}
+best_k<-which.max(f1)
+max(f1,na.rm=TRUE)
+
+KNN.predictions = knn(train_upsampled[,!names(train_upsampled) %in% c("vote")],df_test[,!names(df_test) %in% c("vote")],train_upsampled$vote,k=best_k,prob=TRUE)
+prob <- attr(KNN.predictions, "prob")
+
+# performance
+table(KNN.predictions, df_test$vote)
+# Performance: Confusion matrix
+library(caret)
+confusionMatrix(table(KNN.predictions, df_test$vote))
+
+#ROC
+knn.roc=roc(df_test$vote, prob)
+plot(knn.roc,print.auc=TRUE, auc.polygon=TRUE, grid=c(0.1,0.2) ,max.auc.polygon=TRUE,print.thres=TRUE,auc.polygon.col="skyblue")
+coords(knn.roc, "best")
+
+
+
+
+
+
