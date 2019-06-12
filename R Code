@@ -1,4 +1,12 @@
-#########data preprocessing############
+---
+title: "Final"
+author: "ZHENG JINCAI"
+date: "2019年6月4日"
+output: word_document
+---
+
+```{r}
+#########data preprocessing############3
 library(plyr)
 library(foreign)
 df=read.csv('BEPS.csv')
@@ -20,13 +28,14 @@ df$gender=factor(df$gender)
 levels(df$vote)[levels(df$vote)%in% c("Labour","Liberal Democrat")]<-"2"
 levels(df$vote)[levels(df$vote)%in% c("Conservative")]<-"1"
 dim(df)
-sum(df_test$vote=="1")
 
 #check missing value
 sum(is.na(df))#
-
-##########Data visualization:#########
+```
+```{r}
+#Data visualization:
 library(psych)
+library(ggplot2)
 str(df)
 summary(df)
 describe(df)
@@ -34,23 +43,21 @@ describe(df)
 ##pairplot
 pairs(~.,data=df)
 
-
-library(ggplot2)
 #histplot of age by political knowledge
 ggplot(df, aes(x=age,fill=gender))+
   geom_histogram(position = "identity", alpha = 0.4)
-  
-  
-##########Train Test Split##########
+```
+```{r}
+#Train Test Split
 # Set random seed
 set.seed(1)
-#  70% observations work as training data
+# 70% observations work as training data
 subset = sample(1:nrow(df), 1068) 
 df_train = df[subset,]
-# The rest 30% are test data
+# The rest 30% are test data 
 df_test = df[-subset,]
 
-#############Upsmaple Train Test Split##########
+###Upsmaple
 set.seed(1)
 train_majority = df_train[which(df_train$vote==2),]
 train_minority = df_train[which(df_train$vote==1),]
@@ -59,12 +66,53 @@ train_minority_upsampled = train_minority[subset2,] # reproducible results
 train_upsampled = rbind(train_majority, train_minority_upsampled)
 dim(train_upsampled )
 table(train_upsampled$vote) #check whether we get balanced class label
-
-#############Logistics Regression#############
+```
+```{r}
+#############Logistics
+set.seed(1)
 colnames(df)
 glm.fit = glm(vote~.,data = df_train,family = binomial)
 summary(glm.fit)
-glm.fit = glm(vote~age+economic.cond.national+Blair+Hague+Kennedy+Europe+political.knowledge,data = df_train,family = binomial)
+
+#select significant varibles:
+df_train$Blair4=(df_train$Blair=="4")
+df_train$Blair5=(df_train$Blair=="5")
+df_train$Hague2=(df_train$Hague=="2")
+df_train$Hague4=(df_train$Hague=="4")
+df_train$Hague5=(df_train$Hague=="5")
+df_train$Kennedy4=(df_train$Kennedy=="4")
+df_train$Kennedy5=(df_train$Kennedy=="5")
+df_train$Europe4=(df_train$Europe=="4")
+df_train$Europe6=(df_train$Europe=="6")
+df_train$Europe7=(df_train$Europe=="7")
+df_train$Europe8=(df_train$Europe=="8")
+df_train$Europe9=(df_train$Europe=="9")
+df_train$Europe10=(df_train$Europe=="10")
+df_train$Europe11=(df_train$Europe=="11")
+df_train$political.knowledge2 =(df_train$political.knowledge=="2")
+df_train$political.knowledge3 =(df_train$political.knowledge=="3")
+
+df_test$Blair4=(df_test$Blair=="4")
+df_test$Blair5=(df_test$Blair=="5")
+df_test$Hague2=(df_test$Hague=="2")
+df_test$Hague4=(df_test$Hague=="4")
+df_test$Hague5=(df_test$Hague=="5")
+df_test$Kennedy4=(df_test$Kennedy=="4")
+df_test$Kennedy5=(df_test$Kennedy=="5")
+df_test$Europe4=(df_test$Europe=="4")
+df_test$Europe6=(df_test$Europe=="6")
+df_test$Europe7=(df_test$Europe=="7")
+df_test$Europe8=(df_test$Europe=="8")
+df_test$Europe9=(df_test$Europe=="9")
+df_test$Europe10=(df_test$Europe=="10")
+df_test$Europe11=(df_test$Europe=="11")
+df_test$political.knowledge2 =(df_test$political.knowledge=="2")
+df_test$political.knowledge3 =(df_test$political.knowledge=="3")
+
+glm.fit = glm(vote~age+Blair4+Blair5+Hague2+Hague4+Hague5+Kennedy4+Kennedy5
+              +Europe4+Europe6+Europe7+Europe8+Europe9+Europe10+Europe11+
+                political.knowledge2+political.knowledge3,data = df_train,
+              family = binomial)
 summary(glm.fit)
 
 glm.pred = predict(glm.fit, df_test, type="response")
@@ -80,14 +128,66 @@ library(caret)
 confusionMatrix(table(predictions, df_test$vote_l))
 
 #ROC
+library(pROC)
 glm.roc=roc(df_test$vote, glm.pred)
-plot(glm.roc,print.auc=TRUE, auc.polygon=TRUE, grid=c(0.1,0.2) ,max.auc.polygon=TRUE,print.thres=TRUE,auc.polygon.col="skyblue")
+plot(glm.roc,print.auc=TRUE, auc.polygon=TRUE, grid=c(0.1,0.2) ,
+     max.auc.polygon=TRUE,print.thres=TRUE,auc.polygon.col="skyblue")
 coords(glm.roc, "best")
 
-#########Upsample#########
-glm.fit = glm(vote~age+economic.cond.national+Blair+Hague+Kennedy+Europe+political.knowledge,data = train_upsampled,family = binomial)
+#########Upsample
+glm.fit = glm(vote~.,data = train_upsampled,family = binomial)
+summary(glm.fit)
+
+#select
+train_upsampled$economic.cond.household4=(train_upsampled$economic.cond.household=="4")
+train_upsampled$Blair4=(train_upsampled$Blair=="4")
+train_upsampled$Blair5=(train_upsampled$Blair=="5")
+train_upsampled$Hague2=(train_upsampled$Hague=="2")
+train_upsampled$Hague3=(train_upsampled$Hague=="3")
+train_upsampled$Hague4=(train_upsampled$Hague=="4")
+train_upsampled$Hague5=(train_upsampled$Hague=="5")
+train_upsampled$Kennedy4=(train_upsampled$Kennedy=="4")
+train_upsampled$Kennedy5=(train_upsampled$Kennedy=="5")
+train_upsampled$Europe4=(train_upsampled$Europe=="4")
+train_upsampled$Europe5=(train_upsampled$Europe=="5")
+train_upsampled$Europe6=(train_upsampled$Europe=="6")
+train_upsampled$Europe7=(train_upsampled$Europe=="7")
+train_upsampled$Europe8=(train_upsampled$Europe=="8")
+train_upsampled$Europe9=(train_upsampled$Europe=="9")
+train_upsampled$Europe10=(train_upsampled$Europe=="10")
+train_upsampled$Europe11=(train_upsampled$Europe=="11")
+train_upsampled$political.knowledge2 =(train_upsampled$political.knowledge=="2")
+train_upsampled$political.knowledge3 =(train_upsampled$political.knowledge=="3")
+
+df_test$economic.cond.household4=(df_test$economic.cond.household=="4")
+df_test$Blair4=(df_test$Blair=="4")
+df_test$Blair5=(df_test$Blair=="5")
+df_test$Hague2=(df_test$Hague=="2")
+df_test$Hague3=(df_test$Hague=="3")
+df_test$Hague4=(df_test$Hague=="4")
+df_test$Hague5=(df_test$Hague=="5")
+df_test$Kennedy4=(df_test$Kennedy=="4")
+df_test$Kennedy5=(df_test$Kennedy=="5")
+df_test$Europe4=(df_test$Europe=="4")
+df_test$Europe5=(df_test$Europe=="5")
+df_test$Europe6=(df_test$Europe=="6")
+df_test$Europe7=(df_test$Europe=="7")
+df_test$Europe8=(df_test$Europe=="8")
+df_test$Europe9=(df_test$Europe=="9")
+df_test$Europe10=(df_test$Europe=="10")
+df_test$Europe11=(df_test$Europe=="11")
+df_test$political.knowledge2 =(df_test$political.knowledge=="2")
+df_test$political.knowledge3 =(df_test$political.knowledge=="3")
+
+glm.fit = glm(vote~age+economic.cond.household4+Blair4+Blair5+Hague2
+              +Hague3+Hague4+Hague5+Kennedy4+Kennedy5+Europe4+Europe5
+              +Europe6+Europe7+Europe8+Europe9+Europe10+Europe11+
+                political.knowledge2+political.knowledge3+gender,data
+              = train_upsampled,family = binomial)
+summary(glm.fit)
+
 glm.pred=predict(glm.fit,df_test,type = "response")
-predictions=(glm.pred>1.5)
+predictions=(glm.pred<.5)
 
 # performance
 table(predictions, df_test$vote)
@@ -100,10 +200,12 @@ library(caret)
 confusionMatrix(table(predictions, df_test$vote_l))
 
 glm.roc=roc(df_test$vote, glm.pred)
-plot(glm.roc,print.auc=TRUE, auc.polygon=TRUE, grid=c(0.1,0.2) ,max.auc.polygon=TRUE,print.thres=TRUE,auc.polygon.col="skyblue")
+plot(glm.roc,print.auc=TRUE, auc.polygon=TRUE, grid=c(0.1,0.2) ,
+     max.auc.polygon=TRUE,print.thres=TRUE,auc.polygon.col="skyblue")
 coords(glm.roc, "best")
-
-############## recursive partitioning tree ( no ROC )#########
+```
+```{r}
+############## recursive partitioning tree 这里没有ROC
 library(rpart)
 df.rp = rpart(vote ~ ., data=df_train)
 summary(df.rp)
@@ -116,15 +218,19 @@ plot(df.rp, uniform=TRUE, branch=0.1, margin=0.1)
 text(df.rp, all=TRUE, use.n=TRUE)
 
 # performance
+###Sample
 predictions = predict(df.rp, df_test, type="class")
 table(predictions, df_test$vote)
-
 # performance: Confusion matrix
 library(caret)
 confusionMatrix(table(predictions, df_test$vote))
 
+rp.prob<-predict(df.rp, df_test, type="prob")
+ROC<-roc(df_test$vote,rp.prob[,2])
+plot(ROC, print.auc=TRUE, auc.polygon=TRUE, grid=c(0.1,0.2) ,
+     max.auc.polygon=TRUE, print.thres=TRUE,auc.polygon.col="skyblue")
 
-#######Upsample
+###Upsample
 library(rpart)
 df.rp = rpart(vote ~ ., data=train_upsampled)
 summary(df.rp)
@@ -137,13 +243,20 @@ plot(df.rp, uniform=TRUE, branch=0.1, margin=0.1)
 text(df.rp, all=TRUE, use.n=TRUE)
 
 # performance
+###Sample
 predictions = predict(df.rp, df_test, type="class")
 table(predictions, df_test$vote)
 # performance: Confusion matrix
 library(caret)
 confusionMatrix(table(predictions, df_test$vote))
 
-############ conditional inference tree###########
+rp.prob<-predict(df.rp, df_test, type="prob")
+rp.roc<-roc(df_test$vote,rp.prob[,2])
+plot(rp.roc, print.auc=TRUE, auc.polygon=TRUE, grid=c(0.1,0.2) ,
+     max.auc.polygon=TRUE, print.thres=TRUE,auc.polygon.col="skyblue")
+```
+```{r}
+############ conditional inference tree
 library(party)
 df.ci = ctree(vote ~ ., data=df_train)
 df.ci
@@ -151,7 +264,7 @@ df.ci
 # visualize the tree
 plot(df.ci) # too big 
 # export the tree graph
-jpeg(file="c:/tmp/df.ci.jpg",width=2000,height=1000)
+jpeg(file="c:/Users/75228/Desktop/BA/df.ci.jpg",width=2000,height=1000)
 plot(df.ci, main="CI Tree") 
 dev.off() # close the plot
 
@@ -161,6 +274,11 @@ table(predictions, df_test$vote)
 # performance: Confusion matrix
 library(caret)
 confusionMatrix(table(predictions, df_test$vote))
+
+ci.prob<-predict(df.ci, df_test, type="node")
+ci.roc<-roc(df_test$vote,ci.prob)
+plot(ci.roc, print.auc=TRUE, auc.polygon=TRUE, grid=c(0.1,0.2) ,
+     max.auc.polygon=TRUE, print.thres=TRUE,auc.polygon.col="skyblue")
 
 ####Upsample
 library(party)
@@ -170,19 +288,24 @@ df.ci
 # visualize the tree
 plot(df.ci) # too big 
 # export the tree graph
-jpeg(file="c:/tmp/df.ci.jpg",width=2000,height=1000)
+jpeg(file="c:/Users/75228/Desktop/BA/df.ci.up.jpg",width=2000,height=1000)
 plot(df.ci, main="CI Tree") 
 dev.off() # close the plot
 
 # performance
 predictions = predict(df.ci, df_test)
 table(predictions, df_test$vote)
-
 # performance: Confusion matrix
 library(caret)
 confusionMatrix(table(predictions, df_test$vote))
 
-################NaiveBayes## no ROC##############
+ci.prob<-predict(df.ci, df_test, type="node")
+ci.roc<-roc(df_test$vote,ci.prob)
+plot(ci.roc, print.auc=TRUE, auc.polygon=TRUE, grid=c(0.1,0.2) ,
+     max.auc.polygon=TRUE, print.thres=TRUE,auc.polygon.col="skyblue")
+```
+```{r}
+################NaiveBayes## ROC
 library(e1071)
 df.NB = naiveBayes(df_train[,!names(df_train) %in% c("vote")], df_train$vote)
 df.NB
@@ -194,6 +317,11 @@ table(predictions, df_test$vote)
 library(caret)
 confusionMatrix(table(predictions, df_test$vote))
 
+nb.prob<-predict(df.NB, df_test, type="raw")
+nb.roc<-roc(df_test$vote,nb.prob[,2])
+plot(nb.roc, print.auc=TRUE, auc.polygon=TRUE, grid=c(0.1,0.2) ,
+     max.auc.polygon=TRUE, print.thres=TRUE,auc.polygon.col="skyblue")
+
 ##Upsample
 df.NB = naiveBayes(train_upsampled[,!names(train_upsampled) %in% c("vote")], train_upsampled$vote)
 df.NB
@@ -204,8 +332,13 @@ table(predictions,  df_test$vote)
 library(caret)
 confusionMatrix(table(predictions, df_test$vote))
 
-############ random forest########no ROC###############
-install.packages("randomForest")
+nb.prob<-predict(df.NB, df_test, type="raw")
+nb.roc<-roc(df_test$vote,nb.prob[,2])
+plot(nb.roc, print.auc=TRUE, auc.polygon=TRUE, grid=c(0.1,0.2) ,
+     max.auc.polygon=TRUE, print.thres=TRUE,auc.polygon.col="skyblue")
+```
+```{r}
+############ random forest########no ROC
 library(randomForest)
 df.rf = randomForest(vote ~ ., data=df_train, importance=T)
 df.rf
@@ -214,10 +347,14 @@ importance(df.rf)
 # performance
 predictions = predict(df.rf, df_test)
 table(predictions, df_test$vote)
-
 # Performance: Confusion matrix
 library(caret)
 confusionMatrix(table(predictions, df_test$vote))
+
+rf.prob<-predict(df.rf, df_test, type="prob")
+rf.roc<-roc(df_test$vote,rf.prob[,2])
+plot(rf.roc, print.auc=TRUE, auc.polygon=TRUE, grid=c(0.1,0.2) ,
+     max.auc.polygon=TRUE, print.thres=TRUE,auc.polygon.col="skyblue")
 
 ###Upsample
 df.rf = randomForest(vote ~ ., data=train_upsampled, importance=T)
@@ -231,12 +368,16 @@ table(predictions, df_test$vote)
 library(caret)
 confusionMatrix(table(predictions, df_test$vote))
 
+rf.prob<-predict(df.rf, df_test, type="prob")
+rf.roc<-roc(df_test$vote,rf.prob[,2])
+plot(rf.roc, print.auc=TRUE, auc.polygon=TRUE, grid=c(0.1,0.2) ,
+     max.auc.polygon=TRUE, print.thres=TRUE,auc.polygon.col="skyblue")
+```
+```{r}
 ####################linear discriminant analysis(LDA)
 library (MASS) 
-
 lda.fit=lda(vote~.,data=df_train)
 lda.fit
-
 lda.pred=predict(lda.fit,df_test,type="response")
 
 # performance
@@ -245,11 +386,15 @@ table(lda.class, df_test$vote)
 # performance: confusion matrix
 library(caret)
 confusionMatrix(table(lda.class, df_test$vote))
+
+lda.prob<-predict(lda.fit, df_test)
+lda.roc<-roc(df_test$vote,lda.prob$posterior[,2])
+plot(lda.roc, print.auc=TRUE, auc.polygon=TRUE, grid=c(0.1,0.2) ,
+     max.auc.polygon=TRUE, print.thres=TRUE,auc.polygon.col="skyblue")
 
 #Upsample####
 lda.fit=lda(vote~.,data=train_upsampled)
 lda.fit
-
 lda.pred=predict(lda.fit,df_test,type="response")
 
 # performance
@@ -259,21 +404,15 @@ table(lda.class, df_test$vote)
 library(caret)
 confusionMatrix(table(lda.class, df_test$vote))
 
+lda.prob<-predict(lda.fit, df_test)
+lda.roc<-roc(df_test$vote,lda.prob$posterior[,2])
+plot(lda.roc, print.auc=TRUE, auc.polygon=TRUE, grid=c(0.1,0.2) ,
+     max.auc.polygon=TRUE, print.thres=TRUE,auc.polygon.col="skyblue")
+```
+```{r}
 ################SVM#############
 library(e1071)
-df.SVM = svm(vote~., data=df_train, kernel="radial", cost=1, gamma=1/ncol(df_train))
-summary(df.SVM)
-
-# performance
-predictions = predict(df.SVM, df_test[,!names(df_test) %in% c("vote")])
-table(predictions, df_test$vote)
-# performance: confusion matrix
-library(caret)
-confusionMatrix(table(predictions, df_test$vote)
-
-####Upsample
-library(e1071)
-df.SVM = svm(vote~., data=train_upsampled, kernel="radial", cost=1, gamma=1/ncol(train_upsampled))
+df.SVM = svm(vote~., data=df_train, kernel="radial", cost=1, gamma=1/ncol(df_train),probability = TRUE)
 summary(df.SVM)
 
 # performance
@@ -283,9 +422,35 @@ table(predictions, df_test$vote)
 library(caret)
 confusionMatrix(table(predictions, df_test$vote))
 
+svm.pred<-predict(df.SVM, df_test,probability=TRUE,decision.values=TRUE)
+svm.prob<-attr(svm.pred,'probabilities')[,2]
+svm.roc<-roc(df_test$vote,svm.prob)
+plot(svm.roc, print.auc=TRUE, auc.polygon=TRUE, grid=c(0.1,0.2) ,
+     max.auc.polygon=TRUE, print.thres=TRUE,auc.polygon.col="skyblue")
+
+####Upsample
+library(e1071)
+df.SVM = svm(vote~., data=train_upsampled, kernel="radial", 
+             cost=1, gamma=1/ncol(train_upsampled),probability=TRUE)
+summary(df.SVM)
+
+# performance
+predictions = predict(df.SVM, df_test[,!names(df_test) %in% c("vote")])
+table(predictions, df_test$vote)
+# performance: confusion matrix
+library(caret)
+confusionMatrix(table(predictions, df_test$vote))
+
+svm.pred<-predict(df.SVM, df_test,probability=TRUE,decision.values=TRUE)
+svm.prob<-attr(svm.pred,'probabilities')[,2]
+svm.roc<-roc(df_test$vote,svm.prob)
+plot(svm.roc, print.auc=TRUE, auc.polygon=TRUE, grid=c(0.1,0.2) ,
+     max.auc.polygon=TRUE, print.thres=TRUE,auc.polygon.col="skyblue")
+```
+```{r}
 # GBM#################################################################
-###此处vote变换了data type 为dummy/numeric
-install.packages("gbm")
+###change "vote" data type to dummy/numeric
+# GBM
 library(gbm)
 
 head(df_train)
@@ -295,8 +460,6 @@ df_test=df_test[,!names(df_test) %in% c("1", "2")]
 df_train$vote = ifelse(df_train$vote=="1", 1, 0)
 df_test$vote = ifelse(df_test$vote=="1", 1, 0)
 
-str(df)
-set.seed(1)
 df.GBM=gbm(vote~., distribution="bernoulli", data=df_train, n.trees=1000, 
               interaction.depth=7, shrinkage=0.01, cv.folds = 3)
 summary(df.GBM)
@@ -308,7 +471,8 @@ pred = predict(df.GBM, df_test, n.trees=1000)
 # install.packages("pROC")
 library(pROC)
 df.roc=roc(df_test$vote, pred)
-plot(df.roc,print.auc=TRUE, auc.polygon=TRUE, grid=c(0.1,0.2) ,max.auc.polygon=TRUE,print.thres=TRUE,auc.polygon.col="skyblue")
+plot(df.roc,print.auc=TRUE, auc.polygon=TRUE, grid=c(0.1,0.2) ,
+     max.auc.polygon=TRUE,print.thres=TRUE,auc.polygon.col="skyblue")
 coords(df.roc, "best")
 
 # obtaining the classification table
@@ -339,7 +503,8 @@ pred = predict(df.GBM, df_test, n.trees=1000)
 # install.packages("pROC")
 library(pROC)
 df.roc=roc(df_test$vote, pred)
-plot(df.roc,print.auc=TRUE, auc.polygon=TRUE, grid=c(0.1,0.2) ,max.auc.polygon=TRUE,print.thres=TRUE,auc.polygon.col="skyblue")
+plot(df.roc,print.auc=TRUE, auc.polygon=TRUE, grid=c(0.1,0.2) ,
+     max.auc.polygon=TRUE,print.thres=TRUE,auc.polygon.col="skyblue")
 coords(df.roc, "best")
 
 # obtaining the classification table
@@ -348,8 +513,8 @@ table(predictions, df_test$vote)
 # performance: confusion matrix
 library(caret)
 confusionMatrix(table(predictions, df_test$vote))
-
-############################3
+```
+```{r}
 ###此处所有变量为numeric
 ##########KNN
 df=read.csv('BEPS.csv')
@@ -372,7 +537,8 @@ subset = sample(1:nrow(df), 1068)
 df_train = df[subset,]
 # The rest 30% are test data
 df_test = df[-subset,]
-
+###KNN
+library(MLmetrics)
 Xtrain=df_train[,-1]
 Xtest=df_test[,-1]
 library(class)
@@ -385,7 +551,8 @@ for (k in k_vector){
 }
 best_k<-which.max(f1)
 max(f1,na.rm=TRUE)
-KNN.predictions = knn(df_train[,!names(df_train) %in% c("vote")],df_test[,!names(df_test) %in% c("vote")],df_train$vote,k=best_k,prob=TRUE)
+KNN.predictions = knn(df_train[,!names(df_train) %in% c("vote")],
+                df_test[,!names(df_test) %in% c("vote")],df_train$vote,k=best_k,prob=TRUE)
 prob <- attr(KNN.predictions, "prob")
 # performance
 table(KNN.predictions, df_test$vote)
@@ -395,7 +562,8 @@ confusionMatrix(table(KNN.predictions, df_test$vote))
 
 #ROC
 knn.roc=roc(df_test$vote, prob)
-plot(knn.roc,print.auc=TRUE, auc.polygon=TRUE, grid=c(0.1,0.2) ,max.auc.polygon=TRUE,print.thres=TRUE,auc.polygon.col="skyblue")
+plot(knn.roc,print.auc=TRUE, auc.polygon=TRUE, grid=c(0.1,0.2) ,
+     max.auc.polygon=TRUE,print.thres=TRUE,auc.polygon.col="skyblue")
 coords(knn.roc, "best")
 
 ####upsampling for knn
@@ -453,7 +621,8 @@ for (k in k_vector){
 best_k<-which.max(f1)
 max(f1,na.rm=TRUE)
 
-KNN.predictions = knn(train_upsampled[,!names(train_upsampled) %in% c("vote")],df_test[,!names(df_test) %in% c("vote")],train_upsampled$vote,k=best_k,prob=TRUE)
+KNN.predictions = knn(train_upsampled[,!names(train_upsampled) %in% c("vote")],
+                df_test[,!names(df_test) %in% c("vote")],train_upsampled$vote,k=best_k,prob=TRUE)
 prob <- attr(KNN.predictions, "prob")
 
 # performance
@@ -464,11 +633,6 @@ confusionMatrix(table(KNN.predictions, df_test$vote))
 
 #ROC
 knn.roc=roc(df_test$vote, prob)
-plot(knn.roc,print.auc=TRUE, auc.polygon=TRUE, grid=c(0.1,0.2) ,max.auc.polygon=TRUE,print.thres=TRUE,auc.polygon.col="skyblue")
+plot(knn.roc,print.auc=TRUE, auc.polygon=TRUE, grid=c(0.1,0.2) ,
+     max.auc.polygon=TRUE,print.thres=TRUE,auc.polygon.col="skyblue")
 coords(knn.roc, "best")
-
-
-
-
-
-
